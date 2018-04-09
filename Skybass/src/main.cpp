@@ -9,6 +9,10 @@
 
   The GPIO pin which is controlled by these commands
   is called 'onpin'.
+
+
+  If the serial into the ESP contains "Arm"/"Disarm", it will tell motherboard ESP to arm/disarm. If it contains
+  "Stage", it will tell the Staging ESP to trigger staging
 */
 
 #include <Arduino.h>
@@ -18,7 +22,6 @@
 
 const char WiFiAPPSK[] = "redshift";
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
-const int stagePin = 7; //CHECK
 
 WiFiServer server(80);
 
@@ -61,6 +64,7 @@ void loop() {
   String send_to_teensy ="";
 
 
+  String esp_cmd = Serial.readString();  //TO DO - check this
 
   //connect to motherboard, get Status
   HTTPClient mbHttp;
@@ -97,10 +101,7 @@ void loop() {
 
 
 
-//SEND TO TEENSY - send_to_teensy
-
-
-if(digitalRead(stagePin)==HIGH)
+if(esp_cmd.indexOf("Stage")!=-1)
 {
   String resp = "";
   HTTPClient stHttp;
@@ -121,8 +122,51 @@ if(digitalRead(stagePin)==HIGH)
     send_to_teensy += resp;
 }
 
+if(esp_cmd.indexOf("Arm")!=-1)
+{
+  String resp = "";
+  HTTPClient stHttp;
+  stHttp.begin("http:/"+motherboard_ip+":80/arm_s");
+  stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  int stHttpCode = stHttp.GET();
+  if (stHttpCode > 0) {
+      // HTTP header has been send and Server response header has been handled
+      // file found at server
+      if (stHttpCode == HTTP_CODE_OK) {
+        String payload = stHttp.getString();
+        resp +="\nArming Response: "+payload;
+      }
+    } else {
+    }
+
+    stHttp.end();
+    send_to_teensy += resp;
+}
+
+if(esp_cmd.indexOf("Disarm")!=-1)
+{
+  String resp = "";
+  HTTPClient stHttp;
+  stHttp.begin("http:/"+motherboard_ip+":80/disarm_s");
+  stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  int stHttpCode = stHttp.GET();
+  if (stHttpCode > 0) {
+      // HTTP header has been send and Server response header has been handled
+      // file found at server
+      if (stHttpCode == HTTP_CODE_OK) {
+        String payload = stHttp.getString();
+        resp +="\nArming Response: "+payload;
+      }
+    } else {
+    }
+
+    stHttp.end();
+    send_to_teensy += resp;
+}
 
 
+
+Serial.print(send_to_teensy);
 
 
 // Check if a client has connected
