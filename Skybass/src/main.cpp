@@ -80,7 +80,7 @@ void loop() {
         send_to_teensy +="Motherboard: "+payload;
       }
     } else {
-      Serial.println("MB HTTP Request failed, code" + stHttpCode);
+      Serial.println("MB HTTP Request failed, code" + mbHttpCode);
     }
 
     mbHttp.end();
@@ -125,6 +125,40 @@ if(esp_cmd.indexOf("Stage")!=-1)
 
     stHttp.end();
     send_to_teensy += resp;
+
+
+  WiFiClient client;
+  String host = motherboard_ip;
+  Serial.print("\n[Connecting to %s ... "+ host);
+  if (client.connect(host, 80))
+  {
+    Serial.println("connected]");
+
+    Serial.println("[Sending a request]");
+    client.print(String("GET /") + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: close\r\n" +
+                 "\r\n"
+                );
+
+    Serial.println("[Response:]");
+    while (client.connected())
+    {
+      if (client.available())
+      {
+        String line = client.readStringUntil('\n');
+        Serial.println(line);
+      }
+    }
+    client.stop();
+    Serial.println("\n[Disconnected]");
+  }
+  else
+  {
+    Serial.println("connection failed!]");
+    client.stop();
+  }
+
 }
 
 if(esp_cmd.indexOf("Arm")!=-1)
