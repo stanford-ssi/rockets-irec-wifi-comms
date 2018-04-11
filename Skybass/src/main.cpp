@@ -80,6 +80,7 @@ void loop() {
         send_to_teensy +="Motherboard: "+payload;
       }
     } else {
+      Serial.println("MB HTTP Request failed, code" + stHttpCode);
     }
 
     mbHttp.end();
@@ -93,9 +94,10 @@ void loop() {
         // file found at server
         if (stHttpCode == HTTP_CODE_OK) {
           String payload = stHttp.getString();
-          send_to_teensy +="\nStaging: "+payload;
+          send_to_teensy +="\nStaging Status: "+payload;
         }
       } else {
+        Serial.println("SG HTTP Request failed, code" + stHttpCode);
       }
 
       stHttp.end();
@@ -115,9 +117,10 @@ if(esp_cmd.indexOf("Stage")!=-1)
       // file found at server
       if (stHttpCode == HTTP_CODE_OK) {
         String payload = stHttp.getString();
-        resp +="\nStaging: "+payload;
+        resp +="\nStaging response: "+payload;
       }
     } else {
+      Serial.println("SR HTTP Request failed, code" + stHttpCode);
     }
 
     stHttp.end();
@@ -139,6 +142,7 @@ if(esp_cmd.indexOf("Arm")!=-1)
         resp +="\nArming Response: "+payload;
       }
     } else {
+      Serial.println("AR HTTP Request failed, code" + stHttpCode);
     }
 
     stHttp.end();
@@ -160,6 +164,7 @@ if(esp_cmd.indexOf("Disarm")!=-1)
         resp +="\nArming Response: "+payload;
       }
     } else {
+      Serial.println("DA HTTP Request failed, code" + stHttpCode);
     }
 
     stHttp.end();

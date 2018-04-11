@@ -51,7 +51,7 @@ void loop() {
 
   // Read the first line of the request
   String req = client.readStringUntil('\r');
-  Serial.println(req);
+  Serial.println("Request: "+req);
   client.flush();
 
   // Match the request
