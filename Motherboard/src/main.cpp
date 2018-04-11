@@ -31,7 +31,11 @@ void setup() {
 
     uint8_t mac[WL_MAC_ADDR_LENGTH];
     WiFi.softAPmacAddress(mac);
-    WiFi.config('192.68.0.2');
+    IPAddress ip(192,168,0,2);
+    IPAddress dns(192,168,0,1);
+    IPAddress gateway(192,168,0,1);
+    IPAddress subnet(255,255,255,0);
+    WiFi.config(ip,dns,gateway,subnet);
 
     server.begin();
     WiFi.begin(SkybassAP,WiFiAPPSK);
