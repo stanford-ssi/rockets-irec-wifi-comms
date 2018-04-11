@@ -58,18 +58,19 @@ void setup() {
 
     server.begin();
 }
-String motherboard_ip = "192.168.0.2";
-String staging_ip = "192.168.0.3";
+String motherboard_ip = "192.168.4.2";
+String staging_ip = "192.168.4.3";
 void loop() {
   String send_to_teensy ="";
 
 
   String esp_cmd = Serial.readString();  //TO DO - check this
-
+  Serial.println("Received Serial: "+esp_cmd);
   //connect to motherboard, get Status
   HTTPClient mbHttp;
-  mbHttp.begin("http:/"+motherboard_ip+":80/status_s");
+  mbHttp.begin("http:/"+motherboard_ip+"/status_s");
   mbHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
   int mbHttpCode = mbHttp.GET();
   if (mbHttpCode > 0) {
       // HTTP header has been send and Server response header has been handled
@@ -105,9 +106,10 @@ if(esp_cmd.indexOf("Stage")!=-1)
 {
   String resp = "";
   HTTPClient stHttp;
-  stHttp.begin("http:/"+staging_ip+":80/open_s");
+  stHttp.begin("http:/"+staging_ip+"/open_s");
   stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
   int stHttpCode = stHttp.GET();
+  Serial.print("HTTP response code staging: "+stHttpCode);
   if (stHttpCode > 0) {
       // HTTP header has been send and Server response header has been handled
       // file found at server
@@ -126,7 +128,7 @@ if(esp_cmd.indexOf("Arm")!=-1)
 {
   String resp = "";
   HTTPClient stHttp;
-  stHttp.begin("http:/"+motherboard_ip+":80/arm_s");
+  stHttp.begin("http:/"+motherboard_ip+"/arm_s");
   stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
   int stHttpCode = stHttp.GET();
   if (stHttpCode > 0) {
@@ -147,7 +149,7 @@ if(esp_cmd.indexOf("Disarm")!=-1)
 {
   String resp = "";
   HTTPClient stHttp;
-  stHttp.begin("http:/"+motherboard_ip+":80/disarm_s");
+  stHttp.begin("http:/"+motherboard_ip+"/disarm_s");
   stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
   int stHttpCode = stHttp.GET();
   if (stHttpCode > 0) {
@@ -166,7 +168,7 @@ if(esp_cmd.indexOf("Disarm")!=-1)
 
 
 
-Serial.print(send_to_teensy);
+Serial.println("TO teensy: "+send_to_teensy);
 
 
 // Check if a client has connected

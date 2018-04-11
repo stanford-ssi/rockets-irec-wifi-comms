@@ -31,9 +31,9 @@ void setup() {
 
     uint8_t mac[WL_MAC_ADDR_LENGTH];
     WiFi.softAPmacAddress(mac);
-    IPAddress ip(192,168,0,2);
-    IPAddress dns(192,168,0,1);
-    IPAddress gateway(192,168,0,1);
+    IPAddress ip(192,168,4,2);
+    IPAddress dns(192,168,4,1);
+    IPAddress gateway(192,168,4,1);
     IPAddress subnet(255,255,255,0);
     WiFi.config(ip,dns,gateway,subnet);
 
@@ -103,8 +103,21 @@ void loop() {
   {
     s += "<p>Invalid Request.<br> Try /disarm, /arm, or /status.</p>";
   }
-
-  s += "</body></html>\n";
+  if(req.indexOf("_s")!=-1)
+  { //clean out HTML tags for Skybass
+    s.replaceAll("<b>","");
+    s.replaceAll("</b>","");
+    s.replaceAll("<p>","");
+    s.replaceAll("</p>","");
+    s.replaceAll("HTTP/1.1 200 OK","");
+    s.replaceAll("<!DOCTYPE HTML>","");
+    s.replaceAll("<html>","");
+    s.replaceAll("<head><style>p{text-align:center;font-size:24px;font-family:helvetica;padding:30px;border:1px solid black;background-color:powderblue}</style></head><body>","");
+  }
+  else
+  { //continue normally
+    s += "</body></html>\n";
+  }
 
   // Send the response to the client
   client.print(s);
