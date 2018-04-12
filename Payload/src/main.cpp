@@ -30,7 +30,7 @@ void setup() {
     WiFi.mode(WIFI_STA);
     uint8_t mac[WL_MAC_ADDR_LENGTH];
     WiFi.softAPmacAddress(mac);
-    IPAddress ip(192,168,4,2);
+    IPAddress ip(192,168,4,4);
     IPAddress dns(192,168,4,1);
     IPAddress gateway(192,168,4,1);
     IPAddress subnet(255,255,255,0);

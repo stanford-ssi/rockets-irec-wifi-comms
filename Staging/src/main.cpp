@@ -8,11 +8,8 @@
 const int stepsPerRev = 200;
 const int stepsNorm = 425;
 const int stepsInc = 20;
-
 const int NUMBER_OF_STEPS = 2;
 const int led = 13;
-
-const String pwd = "redshift";
 const char SkybassAP[] = "Skybass";
 const char WiFiAPPSK[] = "redshift";
 int stepstatus = 0;
@@ -60,10 +57,12 @@ void setup() {
   WiFi.mode(WIFI_STA);
   uint8_t mac[WL_MAC_ADDR_LENGTH];
   WiFi.softAPmacAddress(mac);
-  WiFi.config('192.68.0.3');
+  IPAddress ip(192,168,4,3);
+  IPAddress dns(192,168,4,1);
+  IPAddress gateway(192,168,4,1);
+  IPAddress subnet(255,255,255,0);
+  WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.begin(SkybassAP,WiFiAPPSK);
-
-
   server.begin();
 
 }
@@ -78,11 +77,11 @@ void loop() {
 
   // Read the first line of the request
   String req = client.readStringUntil('\r');
-  Serial.println(req);
+  Serial.println("Recvd Request: "+req);
   client.flush();
-
+  String resp = "";
   // Prepare the response. Start with the common header:
-  String s = "HTTP/1.1 200 OK\r\n";
+/*  String s = "HTTP/1.1 200 OK\r\n";
   s += "Content-Type: text/html\r\n\r\n";
   s += "<!DOCTYPE HTML>\r\n<html>\r\n";
   s += "<head><style>p{text-align:center;font-size:24px;font-family:helvetica;padding:30px;border:1px solid black;background-color:powderblue}</style></head><body>";
@@ -90,34 +89,47 @@ void loop() {
   // Match the request
   int val = -1; // We'll use 'val' to keep track of both the
                 // request type (read/set) and value if set.
+                */
   if (req.indexOf("/open") != -1){
     openStepper();
-    val = 0;
+    resp+="Stepper opened";
     stepstatus = 1;
   } else if (req.indexOf("/close") != -1){
     closeStepper();
-    val = 1;
+    resp+="Stepper closed";
     stepstatus = 0;
-  } else if (req.indexOf("/status") != -1){
-    val = 2;
-  } else if (req.indexOf("/hold") != -1){
+  } else if (req.indexOf("/status") != -1)
+  {
+      resp += "Stepper status: ";
+      if(stepstatus == 1) {
+        resp += "opened, ";
+      } else {
+        resp += "closed, ";
+      }
+      if(holdstatus == 1){
+        resp += "holding";
+      } else {
+        resp += "not holding";
+      }
+  }
+  else if (req.indexOf("/hold") != -1){
     holdStepper();
     holdstatus = 1;
-    val = 3;
+    resp += "Stepper holding";
   } else if (req.indexOf("/release") != -1){
     releaseStepper();
     holdstatus = 0;
-    val = 4;
+    resp+= "Stepper released";
   } else if (req.indexOf("/tighten") != -1){
     tightenStepper();
-    val = 5;
+    resp += "Stepper tightened";
   } else if (req.indexOf("/loosen") != -1){
     loosenStepper();
-    val = 6;
+    resp += "Stepper loosened";
   }
 
   client.flush();
-
+/*
   if (val == 0) {
     s += "<p>Stepper is now <b>opened!</b></p>";
 
@@ -153,7 +165,7 @@ void loop() {
   } else {
     s += "<p>Invalid Request.<br> Try /open, /close, /hold, /release, /tighten, /loosen, or /status.</p>";
   }
-
+/*
 if(req.indexOf("_s")!=-1)
 { //clean out HTML tags for Skybass
   s.replaceAll("<b>","");
@@ -170,12 +182,12 @@ else
   s += "</body></html>\n";
 }
 
-
+*/
 
   // Send the response to the client
-  client.print(s);
+  client.print(resp);
   delay(1);
-  Serial.println("Client disonnected");
+  Serial.println("Client disconnected"); //DBG
 
   // The client will actually be disconnected
   // when the function returns and 'client' object is detroyed

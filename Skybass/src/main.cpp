@@ -1,18 +1,18 @@
 /*
-  ESP WiFi Arming Code Rev 01
-  Created by Tylor Jilk, February 2018
-  A part of the IREC Avionics Team of Stanford SSI
+ESP WiFi Arming Code Rev 01
+Created by Tylor Jilk, February 2018
+A part of the IREC Avionics Team of Stanford SSI
 
-  Once the ESP is running, connect to its Wi-Fi network
-  and go to one of 3 websites to do exactly what they
-  sound like: ipaddress/arm, /disarm, or /status
+Once the ESP is running, connect to its Wi-Fi network
+and go to one of 3 websites to do exactly what they
+sound like: ipaddress/arm, /disarm, or /status
 
-  The GPIO pin which is controlled by these commands
-  is called 'onpin'.
+The GPIO pin which is controlled by these commands
+is called 'onpin'.
 
 
-  If the serial into the ESP contains "Arm"/"Disarm", it will tell motherboard ESP to arm/disarm. If it contains
-  "Stage", it will tell the Staging ESP to trigger staging
+If the serial into the ESP contains "Arm"/"Disarm", it will tell motherboard ESP to arm/disarm. If it contains
+"Stage", it will tell the Staging ESP to trigger staging
 */
 
 #include <Arduino.h>
@@ -22,266 +22,111 @@
 
 const char WiFiAPPSK[] = "redshift";
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
+String motherboard_ip = "192.168.4.2";
+String staging_ip = "192.168.4.3";
+String payload_ip = "192.168.4.4";
 
 WiFiServer server(80);
 
 void setup() {
-    Serial.begin(115200);
-    pinMode(onpin, OUTPUT);
-    digitalWrite(onpin, LOW);
-
-    WiFi.mode(WIFI_AP);
-
-    // Do a little work to get a unique-ish name. Append the
-    // last two bytes of the MAC (HEX'd) to "Thing-":
-    uint8_t mac[WL_MAC_ADDR_LENGTH];
-    WiFi.softAPmacAddress(mac);
-    IPAddress ip(192,168,0,1);
-    IPAddress dns(192,168,0,1);
-    IPAddress gateway(192,168,0,1);
-    IPAddress subnet(255,255,255,0);
-    WiFi.config(ip,dns,gateway,subnet);
-
-
-    //String macID = String(mac[WL_MAC_ADDR_LENGTH - 2], HEX) +
-    //                String(mac[WL_MAC_ADDR_LENGTH - 1], HEX);
-    //macID.toUpperCase();
-    String AP_NameString = "Skybass";// + macID;
-
-    char AP_NameChar[AP_NameString.length() + 1];
-    memset(AP_NameChar, 0, AP_NameString.length() + 1);
-
-    for (int i=0; i<AP_NameString.length(); i++)
-        AP_NameChar[i] = AP_NameString.charAt(i);
-
-    WiFi.softAP(AP_NameChar, WiFiAPPSK);
-
-    server.begin();
+  Serial.begin(115200);
+  pinMode(onpin, OUTPUT);
+  digitalWrite(onpin, LOW);
+  WiFi.mode(WIFI_AP);
+  uint8_t mac[WL_MAC_ADDR_LENGTH];
+  WiFi.softAPmacAddress(mac);
+  IPAddress ip(192,168,4,1);
+  IPAddress dns(192,168,4,1);
+  IPAddress gateway(192,168,4,1);
+  IPAddress subnet(255,255,255,0);
+  WiFi.config(ip,dns,gateway,subnet);
+  WiFi.softAPConfig(ip,gateway,subnet);
+  String AP_NameString = "Skybass";
+  char AP_NameChar[AP_NameString.length() + 1];
+  memset(AP_NameChar, 0, AP_NameString.length() + 1);
+  for (int i=0; i<AP_NameString.length(); i++)
+  AP_NameChar[i] = AP_NameString.charAt(i);
+  WiFi.softAP(AP_NameChar, WiFiAPPSK);
+  server.begin();
 }
-String motherboard_ip = "192.168.4.2";
-String staging_ip = "192.168.4.3";
+
+String send_request(String ip, String command){
+  String resp = "";
+  String url = "http://"+ip+"/"+command;
+  Serial.println("Sending request: "+ url); //DBG
+  HTTPClient stHttp;
+  stHttp.begin(url);
+  int stHttpCode = stHttp.GET();
+  if (stHttpCode == HTTP_CODE_OK)
+  {
+      String payload = stHttp.getString();
+      Serial.println("Request to "+url+" OK. Response: "+payload); //DBG
+      resp +="\n"+ ip + "/" + command + " response: "+payload;
+  }
+  else
+  {
+    Serial.println("Request to "+url+" Failed. Code: " + stHttpCode); //DBG
+  }
+  stHttp.end();
+  return resp;
+}
+
 void loop() {
-  String send_to_teensy ="";
+  /**
+* Takes in "Staging", "Arm", or "Disarm" from Skybass Teensy. Sends HTTP request
+* to appropriate IP address. Prints response back to Teensy.
+*
+**/
 
-
+  String out ="";
   String esp_cmd = Serial.readString();  //TO DO - check this
-  Serial.println("Received Serial: "+esp_cmd);
-  //connect to motherboard, get Status
-  HTTPClient mbHttp;
-  mbHttp.begin("http:/"+motherboard_ip+"/status_s");
-  mbHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-  int mbHttpCode = mbHttp.GET();
-  if (mbHttpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
-      // file found at server
-      if (mbHttpCode == HTTP_CODE_OK) {
-        String payload = mbHttp.getString();
-        send_to_teensy +="Motherboard: "+payload;
-      }
-    } else {
-      Serial.println("MB HTTP Request failed, code" + mbHttpCode);
-    }
-
-    mbHttp.end();
-
-    HTTPClient stHttp;
-    stHttp.begin("http:/"+staging_ip+":80/status_s");
-    stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    int stHttpCode = stHttp.GET();
-    if (stHttpCode > 0) {
-        // HTTP header has been send and Server response header has been handled
-        // file found at server
-        if (stHttpCode == HTTP_CODE_OK) {
-          String payload = stHttp.getString();
-          send_to_teensy +="\nStaging Status: "+payload;
-        }
-      } else {
-        Serial.println("SG HTTP Request failed, code" + stHttpCode);
-      }
-
-      stHttp.end();
+  Serial.println("Serial in: "+esp_cmd);
 
 
-
-if(esp_cmd.indexOf("Stage")!=-1)
-{
-  String resp = "";
-  HTTPClient stHttp;
-  stHttp.begin("http:/"+staging_ip+"/open_s");
-  stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  int stHttpCode = stHttp.GET();
-  Serial.print("HTTP response code staging: "+stHttpCode);
-  if (stHttpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
-      // file found at server
-      if (stHttpCode == HTTP_CODE_OK) {
-        String payload = stHttp.getString();
-        resp +="\nStaging response: "+payload;
-      }
-    } else {
-      Serial.println("SR HTTP Request failed, code" + stHttpCode);
-    }
-
-    stHttp.end();
-    send_to_teensy += resp;
-
-
-  WiFiClient client;
-  String host = motherboard_ip;
-  Serial.print("\n[Connecting to %s ... "+ host);
-  if (client.connect(host, 80))
+  if(esp_cmd.indexOf("Stage")!=-1)
   {
-    Serial.println("connected]");
-
-    Serial.println("[Sending a request]");
-    client.print(String("GET /") + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: close\r\n" +
-                 "\r\n"
-                );
-
-    Serial.println("[Response:]");
-    while (client.connected())
-    {
-      if (client.available())
-      {
-        String line = client.readStringUntil('\n');
-        Serial.println(line);
-      }
-    }
-    client.stop();
-    Serial.println("\n[Disconnected]");
+    String staging_response = send_request(staging_ip,"open");
+    out+="Staging Resp. to Open: "+staging_response;
   }
   else
   {
-    Serial.println("connection failed!]");
-    client.stop();
+    String staging_response = send_request(staging_ip,"status");
+    out+="Staging Resp. to Status: "+staging_response;
   }
 
-}
-
-if(esp_cmd.indexOf("Arm")!=-1)
-{
-  String resp = "";
-  HTTPClient stHttp;
-  stHttp.begin("http:/"+motherboard_ip+"/arm_s");
-  stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  int stHttpCode = stHttp.GET();
-  if (stHttpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
-      // file found at server
-      if (stHttpCode == HTTP_CODE_OK) {
-        String payload = stHttp.getString();
-        resp +="\nArming Response: "+payload;
-      }
-    } else {
-      Serial.println("AR HTTP Request failed, code" + stHttpCode);
-    }
-
-    stHttp.end();
-    send_to_teensy += resp;
-}
-
-if(esp_cmd.indexOf("Disarm")!=-1)
-{
-  String resp = "";
-  HTTPClient stHttp;
-  stHttp.begin("http:/"+motherboard_ip+"/disarm_s");
-  stHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  int stHttpCode = stHttp.GET();
-  if (stHttpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
-      // file found at server
-      if (stHttpCode == HTTP_CODE_OK) {
-        String payload = stHttp.getString();
-        resp +="\nArming Response: "+payload;
-      }
-    } else {
-      Serial.println("DA HTTP Request failed, code" + stHttpCode);
-    }
-
-    stHttp.end();
-    send_to_teensy += resp;
-}
-
-
-
-Serial.println("TO teensy: "+send_to_teensy);
-
-
-// Check if a client has connected
-WiFiClient client = server.available();
-if (!client) {
-  return;
-}
-
-// Read the first line of the request
-String req = client.readStringUntil('\r');
-Serial.println(req);
-client.flush();
-
-  // Match the request
-  int val = -1; // We'll use 'val' to keep track of both the
-                // request type (read/set) and value if set.
-  if (req.indexOf("/disarm") != -1)
-    val = 0; // Will write LED low
-  else if (req.indexOf("/arm") != -1)
-    val = 1; // Will write LED high
-  else if (req.indexOf("/status") != -1)
-    val = -2; // Will print pin reads
-  // Otherwise request will be invalid. We'll say as much in HTML
-
-
-
-
-  // Set GPIO5 according to the request
-  if (val >= 0)
-    digitalWrite(onpin, val);
-
-  client.flush();
-
-  // Prepare the response. Start with the common header:
-  String s = "HTTP/1.1 200 OK\r\n";
-  s += "Content-Type: text/html\r\n\r\n";
-  s += "<!DOCTYPE HTML>\r\n<html>\r\n";
-  s += "<head><style>p{text-align:center;font-size:24px;font-family:helvetica;padding:30px;border:1px solid black;background-color:powderblue}</style></head><body>";
-
-  // If we're setting the LED, print out a message saying we did
-  if (val == 0)
+  if(esp_cmd.indexOf("Arm")!=-1)
   {
-    s += "<p>Board is now <b>disarmed</b></p>";
+    String motherboard_arm_response = send_request(motherboard_ip,"arm");
+    out+="Motherboard Resp. to Arm: "+motherboard_arm_response;
   }
-  else if (val == 1)
+  else if(esp_cmd.indexOf("Disarm")!=-1)
   {
-    s += "<p>Board is now <b>armed!</b></p>";
-  }
-  else if (val == -2)
-  {
-    // s += "<br>"; // Go to the next line.
-    s += "<p>Status of output pin: ";
-    if(digitalRead(onpin))
-    {
-      s += "<b>armed!</b></p>";
-    }
-    else
-    {
-      s += "<b>disarmed.</b></p>";
-    }
+    String motherboard_disarm_response = send_request(motherboard_ip,"disarm");
+    out+="Motherboard Resp. to Disarm: "+motherboard_disarm_response;
   }
   else
   {
-    s += "<p>Invalid Request.<br> Try /disarm, /arm, or /status.</p>";
+    String motherboard_status = send_request(motherboard_ip,"status");
+    out+="Motherboard Resp. to Status: "+motherboard_status;
   }
 
-  s += "</body></html>\n";
+  if(esp_cmd.indexOf("ArmPayload")!=-1)
+  {
+    String payload_arm_response = send_request(payload_ip,"arm");
+    out+="Payload Resp. to Arm: "+payload_arm_response;
+  }
+  else if(esp_cmd.indexOf("DisarmPayload")!=-1)
+  {
+    String payload_disarm_response = send_request(payload_ip,"disarm");
+    out+="Payload Resp. to Disarm: "+payload_disarm_response;
+  }
+  else
+  {
+    String payload_status = send_request(payload_ip,"status");
+    out+="Payload Resp. to Status: "+payload_status;
+  }
 
-  // Send the response to the client
-  client.print(s);
-  delay(1);
-  Serial.println("Client disonnected");
 
-  delay(1000);
-  // The client will actually be disconnected
-  // when the function returns and 'client' object is detroyed
+Serial.println("Serial Out: "+out);
+
 }
