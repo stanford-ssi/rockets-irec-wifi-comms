@@ -15,8 +15,8 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 
-const char SkybassAP[] = "Skybass";
-const char WiFiAPPSK[] = "redshift";
+const char MBWifi[] = "Motherboard";
+const char MBWifiPwd[] = "redshift";
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
 String a = "Armed";
 String d = "Disarmed";
@@ -30,13 +30,14 @@ void setup() {
     WiFi.mode(WIFI_STA);
     uint8_t mac[WL_MAC_ADDR_LENGTH];
     WiFi.softAPmacAddress(mac);
-    IPAddress ip(192,168,4,2);
+    IPAddress ip(192,168,4,1);
     IPAddress dns(192,168,4,1);
     IPAddress gateway(192,168,4,1);
     IPAddress subnet(255,255,255,0);
+    WiFi.softAPConfig(ip, gateway,subnet);
     WiFi.config(ip,dns,gateway,subnet);
     server.begin();
-    WiFi.begin(SkybassAP,WiFiAPPSK);
+    WiFi.softAP(MBWifi,MBWifiPwd);
 }
 
 void loop() {

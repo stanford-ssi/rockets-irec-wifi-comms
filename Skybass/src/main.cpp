@@ -21,9 +21,7 @@ const char WiFiAPPSK[] = "redshift";
 const char APName[] = "Skybass";
 const int onpin = 4; // IO5 on the Esp8266 WROOM 02
 const int ledpin = 5;
-String motherboard_ip = "192.168.4.2";
-String staging_ip = "192.168.4.3";
-String payload_ip = "192.168.4.4";
+String payload_ip = "192.168.4.2";
 String a = "Armed";
 String d = "Disarmed";
 WiFiServer server(80);
@@ -76,16 +74,18 @@ void loop() {
 
   String out = "";
 
-
-
   if (Serial.read() == 0xAA)
   {
     digitalWrite(ledpin, LOW);
-    String staging_response = send_request(staging_ip, "open");
-    out += "Staging Resp. to Open: " + staging_response;
+    String pr = send_request(payload_ip, "arm");
+    out += "Payload: " + pr;
   }
-
-
+  if (Serial.read() == 0xAB)
+  {
+  digitalWrite(ledpin, LOW);
+  String pr = send_request(payload_ip, "disarm");
+  out += "Payload: " + pr;
+  }
 
   // Check if a client has connected
   WiFiClient client = server.available();
@@ -108,12 +108,7 @@ void loop() {
     digitalWrite(onpin, 1);
     resp = a;
   }
-  else if (req.indexOf("/stagetest") != -1)
-  {
-    digitalWrite(ledpin, LOW);
-    String staging_response = send_request(staging_ip, "open");
-    out += "Staging Resp. to Open: " + staging_response;
-  }
+
   /*
     else
     {
