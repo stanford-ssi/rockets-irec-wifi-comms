@@ -14,7 +14,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-
+#include <min.h>
 const char APName[] = "Payload";
 const char SkybassAP[] = "Skybass";
 const char WiFiAPPSK[] = "redshift";

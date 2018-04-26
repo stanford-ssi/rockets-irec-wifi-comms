@@ -16,6 +16,13 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 
+#include "min.h"
+#include "min.c"
+
+//port 0 is skybass serial
+//port 1 is payload client
+struct min_context skyb_ctx;
+struct min_context payload_ctx;
 
 const char WiFiAPPSK[] = "redshift";
 const char APName[] = "Skybass";
@@ -25,6 +32,102 @@ String payload_ip = "192.168.4.2";
 String a = "Armed";
 String d = "Disarmed";
 WiFiServer server(80);
+WiFiClient client;
+uint8_t skyb_data;
+uint16_t min_tx_space(uint8_t port)
+{
+  // Ignore 'port' because we have just one context. But in a bigger application
+  // with multiple ports we could make an array indexed by port to select the serial
+  // port we need to use.
+  uint16_t n =-1;
+  switch(port)
+  {
+
+    case 0:
+    n=Serial.available();
+    break;
+    case 1:
+    n=client.available();
+    break;
+
+  }
+
+  return n;
+}
+
+void min_tx_byte(uint8_t port, uint8_t byte)
+{
+  switch(port)
+  {
+    case 0:
+    Serial.write(&byte,1U);
+    break;
+    case 1:
+    client.write(&byte, 1U);
+    break;
+
+  }
+
+}
+uint32_t min_time_ms(void)
+{
+  return millis();
+}
+
+
+void min_application_handler(uint8_t min_id, uint8_t *min_payload, uint8_t len_payload, uint8_t port)
+{
+  // In this simple example application we just echo the frame back when we get one, with the MIN ID
+  // one more than the incoming frame.
+  //
+  // We ignore the port because we have one context, but we could use it to index an array of
+  // contexts in a bigger application.
+  uint32_t now = millis();
+  switch(port)
+  {
+    case 0:
+    //RECVD FROM SKYBASS
+      memcpy(&skyb_data, min_payload, len_payload);
+      if(skyb_data == 0xAA)
+      {
+        digitalWrite(ledpin, LOW);
+        if(!min_queue_frame(&payload_ctx, 0x33U, (uint8_t *)&now, 4U))
+        {
+          // The queue has overflowed for some reason
+          Serial.print("Can't queue at time ");
+          Serial.println(millis());
+        }
+        //String pr = send_request(payload_ip, "arm");
+        //out += "Payload: " + pr;
+      }
+      if(skyb_data == 0xAB)
+      {
+        digitalWrite(ledpin, LOW);
+        if(!min_queue_frame(&payload_ctx, 0x33U, (uint8_t *)&now, 4U))
+        {
+          // The queue has overflowed for some reason
+          Serial.print("Can't queue at time ");
+          Serial.println(millis());
+        }
+        //String pr = send_request(payload_ip, "arm");
+        //out += "Payload: " + pr;
+      }
+    break;
+
+    case 1:
+    //STATUS OF PAYLOAD
+    break;
+
+  }
+//  Serial.print("MIN frame with ID ");
+//  Serial.print(min_id);
+//  Serial.print(" received at ");
+//  Serial.println(millis());
+//  min_id++;
+  // The frame echoed back doesn't go through the transport protocol: it's send back directly
+  // as a datagram (and could be lost if there were noise on the serial line).
+  //min_send_frame(&min_ctx, min_id, min_payload, len_payload);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -43,6 +146,8 @@ void setup() {
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.softAP(APName, WiFiAPPSK);
   server.begin();
+  min_init_context(&payload_ctx, 0);
+  min_init_context(&skyb_ctx, 0);
 }
 
 String send_request(String ip, String command) {
@@ -71,6 +176,41 @@ void loop() {
     Takes in "Staging", "Arm", or "Disarm" from Skybass Teensy. Sends HTTP request
     to appropriate IP address. Prints response back to Teensy.
   **/
+
+
+    char buf1[32];
+    size_t buf_len1;
+
+    // Read some bytes from the USB serial port..
+    if(Serial.available() > 0) {
+      buf_len1 = Serial.readBytes(buf1, 32U);
+    }
+    else {
+      buf_len1 = 0;
+    }
+    // .. and push them into MIN. It doesn't matter if the bytes are read in one by
+    // one or in a chunk (other than for efficiency) so this can match the way in which
+    // serial handling is done (e.g. in some systems the serial port hardware register could
+    // be polled and a byte pushed into MIN as it arrives).
+    min_poll(&skyb_ctx, (uint8_t *)buf1, (uint8_t)buf_len1);
+
+    char buf2[32];
+    size_t buf_len2;
+
+    // Read some bytes from the USB serial port..
+    if(client.available() > 0) {
+      buf_len2 = client.readBytes(buf2, 32U);
+    }
+    else {
+      buf_len2 = 0;
+    }
+    // .. and push them into MIN. It doesn't matter if the bytes are read in one by
+    // one or in a chunk (other than for efficiency) so this can match the way in which
+    // serial handling is done (e.g. in some systems the serial port hardware register could
+    // be polled and a byte pushed into MIN as it arrives).
+    min_poll(&payload_ctx, (uint8_t *)buf2, (uint8_t)buf_len2);
+
+
 
   String out = "";
 

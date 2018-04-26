@@ -14,6 +14,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <min.h>
 
 const char MBWifi[] = "Motherboard";
 const char MBWifiPwd[] = "redshift";
