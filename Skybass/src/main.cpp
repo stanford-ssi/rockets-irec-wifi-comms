@@ -21,8 +21,7 @@
 
 //port 0 is skybass serial
 //port 1 is payload client
-struct min_context skyb_ctx;
-struct min_context payload_ctx;
+struct min_context min_ctx;
 
 const char WiFiAPPSK[] = "redshift";
 const char APName[] = "Skybass";
@@ -60,7 +59,7 @@ void min_tx_byte(uint8_t port, uint8_t byte)
   switch(port)
   {
     case 0:
-    Serial.write(&byte,1U);
+    Serial.write(&byte, 1U);
     break;
     case 1:
     client.write(&byte, 1U);
@@ -77,56 +76,27 @@ uint32_t min_time_ms(void)
 
 void min_application_handler(uint8_t min_id, uint8_t *min_payload, uint8_t len_payload, uint8_t port)
 {
-  // In this simple example application we just echo the frame back when we get one, with the MIN ID
-  // one more than the incoming frame.
-  //
-  // We ignore the port because we have one context, but we could use it to index an array of
-  // contexts in a bigger application.
   uint32_t now = millis();
   switch(port)
   {
     case 0:
     //RECVD FROM SKYBASS
-      memcpy(&skyb_data, min_payload, len_payload);
-      if(skyb_data == 0xAA)
-      {
-        digitalWrite(ledpin, LOW);
-        if(!min_queue_frame(&payload_ctx, 0x33U, (uint8_t *)&now, 4U))
-        {
-          // The queue has overflowed for some reason
-          Serial.print("Can't queue at time ");
-          Serial.println(millis());
-        }
-        //String pr = send_request(payload_ip, "arm");
-        //out += "Payload: " + pr;
-      }
-      if(skyb_data == 0xAB)
-      {
-        digitalWrite(ledpin, LOW);
-        if(!min_queue_frame(&payload_ctx, 0x33U, (uint8_t *)&now, 4U))
-        {
-          // The queue has overflowed for some reason
-          Serial.print("Can't queue at time ");
-          Serial.println(millis());
-        }
-        //String pr = send_request(payload_ip, "arm");
-        //out += "Payload: " + pr;
-      }
-    break;
+    //IF ID = 0, PASS THROUGH TO PAYLOAD
+    //IF ID = 1, ARM - TO DO
+    //IF ID =  2 DISRAM - TO DO
 
+      switch(min_id)
+      {
+        case 0:
+          min_queue_frame(&min_ctx, 0, min_payload, len_payload);
+          break;
+      }
     case 1:
-    //STATUS OF PAYLOAD
+    //RECVD FROM PAYLOAD
+    //PRINT OUT TO SKYBASS
+    min_queue_frame(&min_ctx, 0, min_payload, len_payload);
     break;
-
-  }
-//  Serial.print("MIN frame with ID ");
-//  Serial.print(min_id);
-//  Serial.print(" received at ");
-//  Serial.println(millis());
-//  min_id++;
-  // The frame echoed back doesn't go through the transport protocol: it's send back directly
-  // as a datagram (and could be lost if there were noise on the serial line).
-  //min_send_frame(&min_ctx, min_id, min_payload, len_payload);
+}
 }
 
 void setup() {
@@ -146,94 +116,38 @@ void setup() {
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.softAP(APName, WiFiAPPSK);
   server.begin();
-  min_init_context(&payload_ctx, 0);
-  min_init_context(&skyb_ctx, 0);
+  min_init_context(&min_ctx, 0);
 }
 
-String send_request(String ip, String command) {
-  String resp = "";
-  String url = "http://" + ip + "/" + command;
-  Serial.println("Sending request: " + url); //DBG
-  HTTPClient stHttp;
-  stHttp.begin(url);
-  int stHttpCode = stHttp.GET();
-  if (stHttpCode == HTTP_CODE_OK)
-  {
-    String payload = stHttp.getString();
-    Serial.println("Request to " + url + " OK. Response: " + payload); //DBG
-    resp += "\n" + ip + "/" + command + " response: " + payload;
+void loop()
+{
+
+  client = server.available();
+  if (!client) {
+    return;
   }
-  else
-  {
-    Serial.println("Request to " + url + " Failed. Code: " + stHttpCode); //DBG
-  }
-  stHttp.end();
-  return resp;
-}
-
-void loop() {
-  /**
-    Takes in "Staging", "Arm", or "Disarm" from Skybass Teensy. Sends HTTP request
-    to appropriate IP address. Prints response back to Teensy.
-  **/
-
-
     char buf1[32];
     size_t buf_len1;
-
-    // Read some bytes from the USB serial port..
     if(Serial.available() > 0) {
       buf_len1 = Serial.readBytes(buf1, 32U);
     }
     else {
       buf_len1 = 0;
     }
-    // .. and push them into MIN. It doesn't matter if the bytes are read in one by
-    // one or in a chunk (other than for efficiency) so this can match the way in which
-    // serial handling is done (e.g. in some systems the serial port hardware register could
-    // be polled and a byte pushed into MIN as it arrives).
-    min_poll(&skyb_ctx, (uint8_t *)buf1, (uint8_t)buf_len1);
+    min_poll(&min_ctx, (uint8_t *)buf1, (uint8_t)buf_len1);
 
     char buf2[32];
     size_t buf_len2;
-
-    // Read some bytes from the USB serial port..
     if(client.available() > 0) {
       buf_len2 = client.readBytes(buf2, 32U);
     }
     else {
       buf_len2 = 0;
     }
-    // .. and push them into MIN. It doesn't matter if the bytes are read in one by
-    // one or in a chunk (other than for efficiency) so this can match the way in which
-    // serial handling is done (e.g. in some systems the serial port hardware register could
-    // be polled and a byte pushed into MIN as it arrives).
-    min_poll(&payload_ctx, (uint8_t *)buf2, (uint8_t)buf_len2);
+    min_poll(&min_ctx, (uint8_t *)buf2, (uint8_t)buf_len2);
 
-
-
-  String out = "";
-
-  if (Serial.read() == 0xAA)
-  {
-    digitalWrite(ledpin, LOW);
-    String pr = send_request(payload_ip, "arm");
-    out += "Payload: " + pr;
-  }
-  if (Serial.read() == 0xAB)
-  {
-  digitalWrite(ledpin, LOW);
-  String pr = send_request(payload_ip, "disarm");
-  out += "Payload: " + pr;
-  }
-
-  // Check if a client has connected
-  WiFiClient client = server.available();
-  if (!client) {
-    return;
-  }
-  // Read the first line of the request
-  String req = client.readStringUntil('\r');
+//BACKUP ARMING BY PHONE
+    String req = client.readStringUntil('\r');
   Serial.println("Recvd Request: " + req); //DBG
   client.flush();
   String resp = "";
@@ -248,44 +162,4 @@ void loop() {
     digitalWrite(onpin, 1);
     resp = a;
   }
-
-  /*
-    else
-    {
-    String staging_response = send_request(staging_ip,"status");
-    out+="Staging Resp. to Status: "+staging_response;
-    }
-    if(esp_cmd.indexOf("Arm")!=-1)
-    {
-    String motherboard_arm_response = send_request(motherboard_ip,"arm");
-    out+="Motherboard Resp. to Arm: "+motherboard_arm_response;
-    }
-    else if(esp_cmd.indexOf("Disarm")!=-1)
-    {
-    String motherboard_disarm_response = send_request(motherboard_ip,"disarm");
-    out+="Motherboard Resp. to Disarm: "+motherboard_disarm_response;
-    }
-    else
-    {
-    String motherboard_status = send_request(motherboard_ip,"status");
-    out+="Motherboard Resp. to Status: "+motherboard_status;
-    }
-    if(esp_cmd.indexOf("ArmPayload")!=-1)
-    {
-    String payload_arm_response = send_request(payload_ip,"arm");
-    out+="Payload Resp. to Arm: "+payload_arm_response;
-    }
-    else if(esp_cmd.indexOf("DisarmPayload")!=-1)
-    {
-    String payload_disarm_response = send_request(payload_ip,"disarm");
-    out+="Payload Resp. to Disarm: "+payload_disarm_response;
-    }
-    else
-    {
-    String payload_status = send_request(payload_ip,"status");
-    out+="Payload Resp. to Status: "+payload_status;
-    }
-  */
-  Serial.println("Serial Out: " + out);
-
 }
