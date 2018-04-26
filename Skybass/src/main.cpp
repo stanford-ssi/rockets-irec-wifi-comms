@@ -21,7 +21,8 @@
 
 //port 0 is skybass serial
 //port 1 is payload client
-struct min_context min_ctx;
+struct min_context skyb_ctx;
+struct min_context payload_ctx;
 
 const char WiFiAPPSK[] = "redshift";
 const char APName[] = "Skybass";
@@ -88,13 +89,13 @@ void min_application_handler(uint8_t min_id, uint8_t *min_payload, uint8_t len_p
       switch(min_id)
       {
         case 0:
-          min_queue_frame(&min_ctx, 0, min_payload, len_payload);
+          min_send_frame(&payload_ctx, 0, min_payload, len_payload);
           break;
       }
     case 1:
     //RECVD FROM PAYLOAD
     //PRINT OUT TO SKYBASS
-    min_queue_frame(&min_ctx, 0, min_payload, len_payload);
+    min_send_frame(&skyb_ctx, 0, min_payload, len_payload);
     break;
 }
 }
@@ -116,7 +117,8 @@ void setup() {
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.softAP(APName, WiFiAPPSK);
   server.begin();
-  min_init_context(&min_ctx, 0);
+  min_init_context(&skyb_ctx, 0);
+  min_init_context(&payload_ctx, 0);
 }
 
 void loop()
@@ -134,7 +136,7 @@ void loop()
     else {
       buf_len1 = 0;
     }
-    min_poll(&min_ctx, (uint8_t *)buf1, (uint8_t)buf_len1);
+    min_poll(&skyb_ctx, (uint8_t *)buf1, (uint8_t)buf_len1);
 
     char buf2[32];
     size_t buf_len2;
@@ -144,10 +146,10 @@ void loop()
     else {
       buf_len2 = 0;
     }
-    min_poll(&min_ctx, (uint8_t *)buf2, (uint8_t)buf_len2);
+    min_poll(&payload_ctx, (uint8_t *)buf2, (uint8_t)buf_len2);
 
 //BACKUP ARMING BY PHONE
-    String req = client.readStringUntil('\r');
+  String req = buf2;//client.readStringUntil('\r');
   Serial.println("Recvd Request: " + req); //DBG
   client.flush();
   String resp = "";
