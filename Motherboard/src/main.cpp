@@ -13,17 +13,22 @@
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
 #include "HTTPUtils.hpp"
 
 const char MBWifi[] = "Motherboard";
 const char MBWifiPwd[] = "redshift";
+
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
+
 String armed = "Armed";
 String disarmed = "Disarmed";
 String invalid = "Invalid Request";
 
 WiFiServer server(80);
+IPAddress ip(192, 168, 4, 1);
+IPAddress dns(192, 168, 4, 1);
+IPAddress gateway(192, 168, 4, 1);
+IPAddress subnet(255, 255, 255, 0);
 
 void setup()
 {
@@ -32,15 +37,11 @@ void setup()
   digitalWrite(onpin, LOW);
 
   WiFi.mode(WIFI_STA);
-  IPAddress ip(192, 168, 4, 1);
-  IPAddress dns(192, 168, 4, 1);
-  IPAddress gateway(192, 168, 4, 1);
-  IPAddress subnet(255, 255, 255, 0);
-
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.config(ip, dns, gateway, subnet);
   server.begin();
   WiFi.softAP(MBWifi, MBWifiPwd);
+
 }
 
 void loop(){
