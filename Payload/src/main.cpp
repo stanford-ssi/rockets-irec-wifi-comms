@@ -13,132 +13,147 @@
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <min.h>
-const char APName[] = "Payload";
-const char SkybassAP[] = "Skybass";
-const char WiFiAPPSK[] = "redshift";
-const int onpin = 5; // IO5 on the Esp8266 WROOM 02
-String a = "Armed";
-String d = "Disarmed";
-IPAddress ip(192,168,4,2);
-int c=0;
-WiFiServer server(80);
-boolean Skybass = false;
-void setup() {
-    Serial.begin(115200);
-    pinMode(onpin, OUTPUT);
-    digitalWrite(onpin, LOW);
-    WiFi.mode(WIFI_STA);
-    uint8_t mac[WL_MAC_ADDR_LENGTH];
-    WiFi.softAPmacAddress(mac);
+#include "HTTPUtils.hpp"
 
-    IPAddress dns(192,168,4,1);
-    IPAddress gateway(192,168,4,1);
-    IPAddress subnet(255,255,255,0);
-    WiFi.config(ip,dns,gateway,subnet);
-    server.begin();
-    WiFi.begin(SkybassAP,WiFiAPPSK);
-    Skybass = true;
+const char AP_SSID[] = "Payload";
+const char STA_SSID[] = "Skybass";
+const char PSK[] = "redshift";
+
+void setupAP();
+void setupSTA();
+
+const int onpin = 5; // IO5 on the Esp8266 WROOM 02
+
+String armed = "Armed";
+String disarmed = "Disarmed";
+String invalid = "Invalid Request";
+
+WiFiServer server(80);
+
+uint32_t scanTimer = millis();
+boolean inSTAMode = false;
+boolean skybassAvailable = false;
+
+void setup()
+{
+  Serial.begin(115200);
+  pinMode(onpin, OUTPUT);
+  digitalWrite(onpin, LOW);
+
+  setupSTA();
+  server.begin();
 }
+
 void checkForSkybass()
 {
-  // WiFi.scanNetworks will return the number of networks found
-  if((WiFi.SSID().equals("Skybass"))&&WiFi.localIP()==ip)
+  skybassAvailable = false;
+  int n = WiFi.scanNetworks();
+  Serial.println("scan done"); //DBG
+  if (n == 0)
   {
-    Skybass = true;
+    Serial.println("no networks found"); //DBG
   }
   else
   {
-    Skybass = false;
-  }
-/*
-
-  int n = WiFi.scanNetworks();
-  Serial.println("scan done"); //DBG
-  if (n == 0) {
-    Serial.println("no networks found"); //DBG
-    Skybass = false;
-  } else {
-    Serial.print(n); //DBG
+    Serial.print(n);                   //DBG
     Serial.println(" networks found"); //DBG
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
+    {
       Serial.print(i + 1);
       Serial.print(": ");
-      Serial.print(WiFi.SSID(i));
-      if(WiFi.SSID(i).equals("Skybass"))
+      Serial.println(WiFi.SSID(i));
+      if (WiFi.SSID(i).equals(STA_SSID))
       {
-        Skybass = true;
+        skybassAvailable = true;
       }
-
     }
   }
-  Serial.println("");
-  */
+  Serial.println();
 }
 
 void setupAP()
 {
-  WiFi.mode(WIFI_AP);
+  WiFi.disconnect();
+
   IPAddress ip(192, 168, 4, 2);
   IPAddress dns(192, 168, 4, 2);
   IPAddress gateway(192, 168, 4, 2);
   IPAddress subnet(255, 255, 255, 0);
+
+  WiFi.mode(WIFI_AP);
   WiFi.config(ip, dns, gateway, subnet);
   WiFi.softAPConfig(ip, gateway, subnet);
-  WiFi.softAP(APName, WiFiAPPSK);
-
+  WiFi.softAP(AP_SSID, PSK);
+  inSTAMode = false;
 }
 
-void loop() {
-  if(!Skybass)
+void setupSTA()
+{
+  WiFi.softAPdisconnect();
+
+  IPAddress ip(192, 168, 4, 2);
+  IPAddress dns(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.config(ip, dns, gateway, subnet);
+  WiFi.begin(STA_SSID, PSK);
+  inSTAMode = true;
+}
+
+void loop()
+{
+
+  if (millis() - scanTimer > 2000)
+  {
+    scanTimer = millis();
+    checkForSkybass();
+  }
+  if (!inSTAMode && skybassAvailable)
+  {
+    setupSTA();
+  }
+  if (!skybassAvailable && inSTAMode)
   {
     setupAP();
   }
 
   // Check if a client has connected
   WiFiClient client = server.available();
-  if (!client) {
+  if (!client)
+  {
     return;
   }
   // Read the first line of the request
   String req = client.readStringUntil('\r');
-  Serial.println("Recvd Request: "+req); //DBG
+  Serial.println("Recvd Request: " + req); //DBG
   client.flush();
   String resp = "";
 
   if (req.indexOf("/disarm") != -1)
   {
     digitalWrite(onpin, 0);
-    resp = d;
+    httputils::HTTPRespond(client, disarmed);
   }
   else if (req.indexOf("/arm") != -1)
   {
-      digitalWrite(onpin, 1);
-      resp = a;
+    digitalWrite(onpin, 1);
+    httputils::HTTPRespond(client, armed);
   }
   else if (req.indexOf("/status") != -1)
   {
-    if(digitalRead(onpin))
+    if (digitalRead(onpin))
     {
-      resp=a;
+      httputils::HTTPRespond(client, armed);
     }
     else
     {
-      resp= d;
+      httputils::HTTPRespond(client, disarmed);
     }
   }
-  client.flush();
-  client.print(resp);
-  delay(1);
-  Serial.println("Client disconnected"); //DBG
-
-  c++;
-  if(c>500)
+  else
   {
-    checkForSkybass();
-    c=0;
+    httputils::HTTPRespond(client, invalid);
   }
-
-
 }
