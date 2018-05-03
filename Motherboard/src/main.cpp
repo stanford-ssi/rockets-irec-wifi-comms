@@ -35,8 +35,7 @@ void setup()
   Serial.begin(115200);
   pinMode(onpin, OUTPUT);
   digitalWrite(onpin, LOW);
-
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(ip, gateway, subnet);
   WiFi.config(ip, dns, gateway, subnet);
   server.begin();

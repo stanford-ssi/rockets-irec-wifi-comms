@@ -24,11 +24,13 @@ void poll_min();
 void min_tx_byte(uint8_t port, uint8_t byte);
 void sendPayloadArming();
 void checkStatus();
-void handleArmingDialog();
+void handleManualArming();
+void handleArming();
+void setSkybassArming();
 
 //port 0 is skybass serial
 struct min_context skyb_ctx;
-
+const int checkTime = 2000; //refresh time to check status in ms
 const char PSK[] = "redshift";
 const char AP_SSID[] = "Skybass";
 
@@ -78,17 +80,17 @@ void loop()
   //poll serial ports into MIN
   poll_min();
   //BACKUP ARMING BY PHONE
-  handleArmingDialog();
+  handleManualArming();
 
-  if (millis() > timer - 2000)
+  if (millis() > timer - checkTime)
   {
     timer = millis();
     checkStatus();
-    min_send_frame(&skyb_ctx, ESP_STATUS, (uint8_t *)&esp_status, sizeof(esp_status));
+    min_queue_frame(&skyb_ctx, ESP_STATUS, (uint8_t *)&esp_status, sizeof(esp_status));
   }
 }
 
-void handleArmingDialog()
+void handleManualArming()
 {
   // Check if a client has connected
   WiFiClient client = server.available();
@@ -135,7 +137,7 @@ void poll_min()
   size_t buf_len;
   if (Serial.available() > 0)
   {
-    buf_len = Serial1.readBytes(buf, 32U);
+    buf_len = Serial.readBytes(buf, 32U);
   }
   else
   {
@@ -149,7 +151,7 @@ void min_tx_byte(uint8_t port, uint8_t byte)
   switch (port)
   {
   case 0:
-    Serial1.write(&byte, 1U);
+    Serial.write(&byte, 1U);
     break;
     /*case 1:
     payload_socket.write(&byte, 1U);
@@ -163,7 +165,7 @@ uint16_t min_tx_space(uint8_t port)
   switch (port)
   {
   case 0:
-    n = Serial1.availableForWrite();
+    n = Serial.availableForWrite();
     break;
     /*case 1:
     n = payload_socket.availableForWrite();
@@ -178,18 +180,40 @@ void min_application_handler(uint8_t min_id, uint8_t *min_payload, uint8_t len_p
   {
   case ESP_ARM:
     memcpy(&esp_arm, min_payload, len_payload);
-    sendPayloadArming();
+    handleArming();
     break;
   case ESP_STATUS:
     break;
   }
 }
 
+void handleArming()
+{
+  sendPayloadArming();
+  setSkybassArming();
+}
+
+
+void setSkybassArming()
+{
+  if (esp_arm.arm_skybass)
+  {
+    digitalWrite(onpin,1);
+    esp_status.skybass_armed = true;
+  }
+  else
+  {
+    digitalWrite(onpin,0);
+    esp_status.skybass_armed = false;
+  }
+
+}
+
 void sendPayloadArming()
 {
   if (payload_socket.connect(payloadIP, 80))
   {
-    Serial.println("Connected");
+    Serial.println("Connected"); //DBG
     esp_status.payload_alive = true;
     if (esp_arm.arm_payload)
     {

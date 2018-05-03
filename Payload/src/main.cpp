@@ -22,6 +22,7 @@ const char PSK[] = "redshift";
 void setupAP();
 void setupSTA();
 
+const int checkTime = 2000; //Interval to check for skybass in ms
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
 
 String armed = "Armed";
@@ -105,7 +106,7 @@ void setupSTA()
 void loop()
 {
 
-  if (millis() - scanTimer > 2000)
+  if (millis() - scanTimer > checkTime)
   {
     scanTimer = millis();
     checkForSkybass();

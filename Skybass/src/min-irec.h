@@ -19,6 +19,7 @@ typedef struct __attribute__((__packed__)) esp_arm_t
   bool arm_skybass;
 } esp_arm_t;
 
+
 typedef struct __attribute__((__packed__)) esp_stage_t
 {
   bool do_stage;
