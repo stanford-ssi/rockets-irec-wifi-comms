@@ -86,7 +86,7 @@ void loop()
   {
     timer = millis();
     checkStatus();
-    min_queue_frame(&skyb_ctx, ESP_STATUS, (uint8_t *)&esp_status, sizeof(esp_status));
+    min_send_frame(&skyb_ctx, ESP_STATUS, (uint8_t *)&esp_status, sizeof(esp_status));
   }
 }
 
