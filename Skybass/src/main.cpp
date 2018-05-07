@@ -219,11 +219,13 @@ void sendPayloadArming()
     {
       payload_socket.println("/arm");
       esp_status.payload_armed = true;
+      digitalWrite(ledpin,HIGH);
     }
     else
     {
       payload_socket.println("/disarm");
       esp_status.payload_armed = false;
+      digitalWrite(ledpin,LOW);
     }
   }
   else
