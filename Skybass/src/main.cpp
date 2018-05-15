@@ -58,7 +58,7 @@ void setup()
   pinMode(onpin, OUTPUT);
   pinMode(ledpin, OUTPUT);
   digitalWrite(onpin, LOW);
-  digitalWrite(ledpin, HIGH);
+  //digitalWrite(ledpin, HIGH);
 
   WiFi.mode(WIFI_AP);
 
