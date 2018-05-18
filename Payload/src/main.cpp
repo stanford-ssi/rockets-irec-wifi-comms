@@ -15,6 +15,8 @@
 #include <ESP8266WiFi.h>
 #include "HTTPUtils.hpp"
 
+const int shim = 13; // controls the power to the pi
+const int pi = 12; // signals to the pi to do an orderly shutdown
 const char AP_SSID[] = "Payload";
 const char STA_SSID[] = "Skybass";
 const char PSK[] = "redshift";
@@ -38,8 +40,10 @@ boolean skybassAvailable = false;
 void setup()
 {
   Serial.begin(115200);
-  pinMode(onpin, OUTPUT);
-  digitalWrite(onpin, LOW);
+  pinMode(shim, OUTPUT);
+    pinMode(pi, OUTPUT);
+    digitalWrite(shim, LOW); // start out disarmed
+    digitalWrite(pi, HIGH);
 
   setupSTA();
   server.begin();
@@ -134,17 +138,20 @@ void loop()
 
   if (req.indexOf("/disarm") != -1)
   {
-    digitalWrite(onpin, 0);
+    digitalWrite(pi, LOW);
+    delay(1000 * 5); // wait 5 seconds for shutdown
+    digitalWrite(shim, LOW);
     httputils::HTTPRespond(client, disarmed);
   }
   else if (req.indexOf("/arm") != -1)
   {
-    digitalWrite(onpin, 1);
+    digitalWrite(pi, HIGH);
+    digitalWrite(shim, HIGH);
     httputils::HTTPRespond(client, armed);
   }
   else if (req.indexOf("/status") != -1)
   {
-    if (digitalRead(onpin))
+    if (digitalRead(shim))
     {
       httputils::HTTPRespond(client, armed);
     }
