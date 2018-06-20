@@ -21,8 +21,6 @@ const char AP_SSID[] = "Payload";
 const char STA_SSID[] = "Skybass";
 const char PSK[] = "redshift";
 
-void setupAP();
-void setupSTA();
 
 const int checkTime = 2000; //Interval to check for skybass in ms
 const int onpin = 5; // IO5 on the Esp8266 WROOM 02
@@ -34,96 +32,29 @@ String invalid = "Invalid Request";
 WiFiServer server(80);
 
 uint32_t scanTimer = millis();
-boolean inSTAMode = false;
-boolean skybassAvailable = false;
 
 void setup()
 {
   Serial.begin(115200);
   pinMode(shim, OUTPUT);
-    pinMode(pi, OUTPUT);
-    digitalWrite(shim, LOW); // start out disarmed
-    digitalWrite(pi, HIGH);
+  pinMode(pi, OUTPUT);
+  digitalWrite(shim, LOW); // start out disarmed
+  digitalWrite(pi, HIGH);  
 
-  setupSTA();
-  server.begin();
-}
-
-void checkForSkybass()
-{
-  skybassAvailable = false;
-  int n = WiFi.scanNetworks();
-  Serial.println("scan done"); //DBG
-  if (n == 0)
-  {
-    Serial.println("no networks found"); //DBG
-  }
-  else
-  {
-    Serial.print(n);                   //DBG
-    Serial.println(" networks found"); //DBG
-    for (int i = 0; i < n; ++i)
-    {
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.println(WiFi.SSID(i));
-      if (WiFi.SSID(i).equals(STA_SSID))
-      {
-        skybassAvailable = true;
-      }
-    }
-  }
-  Serial.println();
-}
-
-void setupAP()
-{
-  WiFi.disconnect();
-
-  IPAddress ip(192, 168, 4, 2);
-  IPAddress dns(192, 168, 4, 2);
-  IPAddress gateway(192, 168, 4, 2);
+  IPAddress ip_s(192, 168, 4, 2);
+  IPAddress ip_a(192, 168, 4, 3);
   IPAddress subnet(255, 255, 255, 0);
 
-  WiFi.mode(WIFI_AP);
-  WiFi.config(ip, dns, gateway, subnet);
-  WiFi.softAPConfig(ip, gateway, subnet);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.config(ip_s, ip_s, ip_s, subnet);
+  WiFi.softAPConfig(ip_a, ip_a, subnet);
   WiFi.softAP(AP_SSID, PSK);
-  inSTAMode = false;
+  server.begin();
+  WiFi.begin(STA_SSID,PSK);
 }
 
-void setupSTA()
+void handleManualArming()
 {
-  WiFi.softAPdisconnect();
-
-  IPAddress ip(192, 168, 4, 2);
-  IPAddress dns(192, 168, 4, 1);
-  IPAddress gateway(192, 168, 4, 1);
-  IPAddress subnet(255, 255, 255, 0);
-
-  WiFi.mode(WIFI_STA);
-  WiFi.config(ip, dns, gateway, subnet);
-  WiFi.begin(STA_SSID, PSK);
-  inSTAMode = true;
-}
-
-void loop()
-{
-
-  if (millis() - scanTimer > checkTime)
-  {
-    scanTimer = millis();
-    checkForSkybass();
-  }
-  if (!inSTAMode && skybassAvailable)
-  {
-    setupSTA();
-  }
-  if (!skybassAvailable && inSTAMode)
-  {
-    setupAP();
-  }
-
   // Check if a client has connected
   WiFiClient client = server.available();
   if (!client)
@@ -138,15 +69,15 @@ void loop()
 
   if (req.indexOf("/disarm") != -1)
   {
-    digitalWrite(pi, LOW);
-    delay(1000 * 5); // wait 5 seconds for shutdown
-    digitalWrite(shim, LOW);
+    digitalWrite(pi,0);
+    delay(2000);
+    digitalWrite(shim,0);
     httputils::HTTPRespond(client, disarmed);
   }
   else if (req.indexOf("/arm") != -1)
   {
-    digitalWrite(pi, HIGH);
-    digitalWrite(shim, HIGH);
+    digitalWrite(shim, 1);
+    digitalWrite(pi, 1);
     httputils::HTTPRespond(client, armed);
   }
   else if (req.indexOf("/status") != -1)
@@ -164,4 +95,20 @@ void loop()
   {
     httputils::HTTPRespond(client, invalid);
   }
+  
 }
+
+void checkConnection()
+{
+  if(WiFi.status()!=WL_CONNECTED)
+  {
+    WiFi.begin(STA_SSID,PSK);
+  }
+}
+
+void loop()
+{
+  handleManualArming();
+  checkConnection();
+}
+  
